@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.playwright-browsers/
+browser-profile/
+*.partial.json
+*.partial.csv
+.DS_Store
