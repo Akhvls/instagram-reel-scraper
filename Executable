@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+VENV_PYTHON = BASE_DIR / ".venv" / "bin" / "python"
+
+
+def maybe_reexec_into_venv() -> None:
+    if not VENV_PYTHON.exists():
+        return
+
+    current_python = Path(sys.executable).resolve()
+    target_python = VENV_PYTHON.resolve()
+    if current_python == target_python:
+        return
+
+    completed = subprocess.run([str(target_python), str(Path(__file__).resolve()), *sys.argv[1:]])
+    raise SystemExit(completed.returncode)
+
+
+maybe_reexec_into_venv()
+
+from scrape_reel_comments import normalize_reel_url, shortcode_from_url
+
+
+def prompt_for_reel_url() -> str:
+    while True:
+        raw_url = input("Enter the Instagram reel URL: ").strip()
+        if not raw_url:
+            print("A reel URL is required.")
+            continue
+
+        reel_url = normalize_reel_url(raw_url)
+        if reel_url is None:
+            print(
+                "Paste a reel URL like https://www.instagram.com/reel/... "
+                "or https://www.instagram.com/reels/..."
+            )
+            continue
+
+        return reel_url
+
+
+def build_output_path(reel_url: str) -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return BASE_DIR / f"comments_{shortcode_from_url(reel_url)}_{timestamp}.json"
+
+
+def run_command(command: list[str], description: str) -> None:
+    print(f"\n{description}...", flush=True)
+    result = subprocess.run(command, cwd=BASE_DIR)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+
+
+def main() -> int:
+    reel_url = prompt_for_reel_url()
+    output_json = build_output_path(reel_url)
+
+    run_command(
+        [
+            sys.executable,
+            str(BASE_DIR / "scrape_reel_comments.py"),
+            reel_url,
+            "-o",
+            str(output_json),
+        ],
+        "Running reel scraper",
+    )
+
+    if not output_json.exists():
+        print(f"Expected scraper output was not created: {output_json}", file=sys.stderr)
+        return 1
+
+    run_command(
+        [
+            sys.executable,
+            str(BASE_DIR / "analyze.py"),
+            str(output_json),
+        ],
+        "Running sentiment analysis",
+    )
+
+    report_path = output_json.parent / "index.html"
+    analysis_path = output_json.parent / "analysis_results.json"
+
+    print("\nWorkflow complete.")
+    print(f"Comments JSON:         {output_json}")
+    print(f"Analysis JSON:         {analysis_path}")
+    print(f"HTML dashboard:        {report_path}")
+    print(f"Open dashboard on mac: open '{report_path}'")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
