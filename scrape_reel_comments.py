@@ -23,6 +23,12 @@ from playwright.sync_api import Error, Page, Response, TimeoutError as Playwrigh
 COMMENT_ICON_SELECTOR = "img[alt='Comment'], svg[aria-label='Comment']"
 DEFAULT_COMMENT_QUERY_NAME = "PolarisPostCommentsContainerQuery"
 HTTP_RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
+DEFAULT_REQUEST_ATTEMPTS = 5
+DEFAULT_INITIAL_BACKOFF_MS = 1_000
+DEFAULT_MAX_BACKOFF_MS = 8_000
+REPLY_REQUEST_ATTEMPTS = 2
+REPLY_INITIAL_BACKOFF_MS = 750
+REPLY_MAX_BACKOFF_MS = 750
 RETRYABLE_ERROR_SNIPPETS = (
     "please wait a few minutes",
     "try again later",
@@ -401,9 +407,11 @@ def fetch_json(
     path: str,
     params: dict[str, Any],
     description: str,
-    attempts: int = 5,
+    attempts: int = DEFAULT_REQUEST_ATTEMPTS,
+    initial_backoff_ms: int = DEFAULT_INITIAL_BACKOFF_MS,
+    max_backoff_ms: int = DEFAULT_MAX_BACKOFF_MS,
 ) -> dict[str, Any]:
-    backoff_ms = 1_000
+    backoff_ms = initial_backoff_ms
     last_error = f"{description} failed."
 
     for attempt in range(1, attempts + 1):
@@ -453,7 +461,7 @@ def fetch_json(
             flush=True,
         )
         page.wait_for_timeout(backoff_ms)
-        backoff_ms = min(backoff_ms * 2, 8_000)
+        backoff_ms = min(backoff_ms * 2, max_backoff_ms)
 
     raise RuntimeError(last_error)
 
@@ -484,6 +492,9 @@ def fetch_child_comments_page(page: Page, media_id: str, parent_comment_id: str,
         f"/api/v1/media/{media_id}/comments/{parent_comment_id}/child_comments/",
         params,
         f"reply request for parent {parent_comment_id}",
+        attempts=REPLY_REQUEST_ATTEMPTS,
+        initial_backoff_ms=REPLY_INITIAL_BACKOFF_MS,
+        max_backoff_ms=REPLY_MAX_BACKOFF_MS,
     )
 
 

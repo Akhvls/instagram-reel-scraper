@@ -2,6 +2,11 @@
 __pycache__/
 .playwright-browsers/
 browser-profile/
+.model-cache/
+nltk_data/
+reports/
+comments_*.json
+comments_*.csv
 *.partial.json
 *.partial.csv
 .DS_Store

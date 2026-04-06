@@ -8,6 +8,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 VENV_PYTHON = BASE_DIR / ".venv" / "bin" / "python"
+REPORTS_DIR = BASE_DIR / "reports"
 
 
 def maybe_reexec_into_venv() -> None:
@@ -47,8 +48,12 @@ def prompt_for_reel_url() -> str:
 
 
 def build_output_path(reel_url: str) -> Path:
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return BASE_DIR / f"comments_{shortcode_from_url(reel_url)}_{timestamp}.json"
+    shortcode = shortcode_from_url(reel_url)
+    report_dir = REPORTS_DIR / f"{shortcode}_{timestamp}"
+    report_dir.mkdir(parents=True, exist_ok=False)
+    return report_dir / f"comments_{shortcode}_{timestamp}.json"
 
 
 def run_command(command: list[str], description: str) -> None:
@@ -61,6 +66,7 @@ def run_command(command: list[str], description: str) -> None:
 def main() -> int:
     reel_url = prompt_for_reel_url()
     output_json = build_output_path(reel_url)
+    report_dir = output_json.parent
 
     run_command(
         [
@@ -83,14 +89,17 @@ def main() -> int:
             str(BASE_DIR / "analyze.py"),
             str(output_json),
         ],
-        "Running sentiment analysis",
+        "Running toxicity analysis",
     )
 
-    report_path = output_json.parent / "index.html"
-    analysis_path = output_json.parent / "analysis_results.json"
+    report_path = report_dir / "index.html"
+    analysis_path = report_dir / "analysis_results.json"
+    csv_path = output_json.with_suffix(".csv")
 
     print("\nWorkflow complete.")
+    print(f"Report directory:      {report_dir}")
     print(f"Comments JSON:         {output_json}")
+    print(f"Comments CSV:          {csv_path}")
     print(f"Analysis JSON:         {analysis_path}")
     print(f"HTML dashboard:        {report_path}")
     print(f"Open dashboard on mac: open '{report_path}'")
